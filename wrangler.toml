@@ -1,0 +1,12 @@
+name = "vulcan-dashboard"
+main = "worker/worker.js"
+compatibility_date = "2024-12-01"
+
+[assets]
+directory = "dashboard/dist"
+binding = "ASSETS"
+not_found_handling = "single-page-application"
+
+[[kv_namespaces]]
+binding = "VULCAN_STATE"
+id = "4714b99956fc4573bdf221b71f6067da"
