@@ -8,6 +8,8 @@
 
 *The edge was never the chart. The edge was the forecast.*
 
+<img src="docs/cover.png" alt="VULCAN cover" width="880"/>
+
 ![Python](https://img.shields.io/badge/Python-3.11-3776AB?style=for-the-badge&logo=python&logoColor=white)
 ![React](https://img.shields.io/badge/React-18-61DAFB?style=for-the-badge&logo=react&logoColor=black)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?style=for-the-badge&logo=typescript&logoColor=white)
@@ -19,7 +21,7 @@
 
 Built in **4 days** for the [lablab.ai × Alpaca AI Trading Agents Hackathon](https://lablab.ai/ai-hackathons/alpaca-ai-trading-agents-hackathon) — Options Alpha Agents track.
 
-**Day 1 result: $100,000.00 → $100,335.37 (+0.34%), fully booked, fully flat.**
+**Live paper result: $100,000.00 → $100,335.24 (+0.34%), fully booked, fully flat.**
 
 </div>
 
@@ -29,17 +31,20 @@ Built in **4 days** for the [lablab.ai × Alpaca AI Trading Agents Hackathon](ht
 
 1. [The Story (plain English)](#the-story-plain-english)
 2. [The Edge in One Sentence](#the-edge-one-sentence)
-3. [How the Maths Works — Step by Step](#how-the-maths-works--step-by-step)
-4. [The 7 Deterministic Risk Gates](#the-7-deterministic-risk-gates)
-5. [The Six Bugs Our Own System Caught](#the-six-bugs-our-own-system-caught)
-6. [Results — Day 1 Live Paper](#results--day-1-live-paper)
-7. [The Dashboard](#the-dashboard)
-8. [Repository Layout](#repository-layout)
-9. [Quick Start](#quick-start)
-10. [The 4-Day Build Log](#the-4-day-build-log)
-11. [Honest Assumptions](#honest-assumptions)
-12. [Tech Stack](#tech-stack)
-13. [License & Disclaimer](#license--disclaimer)
+3. [Live Performance — Real Fills, Real P&L](#live-performance--real-fills-real-pl)
+4. [How the Maths Works — Step by Step](#how-the-maths-works--step-by-step)
+5. [The 7 Deterministic Risk Gates](#the-7-deterministic-risk-gates)
+6. [What Makes VULCAN Original](#what-makes-vulcan-original)
+7. [Alpaca Integration — Technology Implementation](#alpaca-integration--technology-implementation)
+8. [The Six Bugs Our Own System Caught](#the-six-bugs-our-own-system-caught)
+9. [The Dashboard](#the-dashboard)
+10. [Repository Layout](#repository-layout)
+11. [Quick Start](#quick-start)
+12. [The 4-Day Build Log](#the-4-day-build-log)
+13. [Build in Public](#build-in-public)
+14. [Honest Assumptions](#honest-assumptions)
+15. [Tech Stack](#tech-stack)
+16. [License & Disclaimer](#license--disclaimer)
 
 ---
 
@@ -73,6 +78,51 @@ Implied volatility is the market's price of risk. Realized volatility is what
 actually happens. When IV > forecast RV, insurance is overpriced — sell it.
 When IV < forecast RV, insurance is cheap — buy it. VULCAN quantifies that gap
 every cycle and structures defined-risk trades around it.
+
+---
+
+## Live Performance — Real Fills, Real P&L
+
+*Numbers pulled live from the Alpaca paper account (PA3KWDLKC2XQ · ACTIVE · options level 3).*
+
+| Metric | Value |
+|--------|-------|
+| Start equity | $100,000.00 |
+| Current equity | **$100,335.24** |
+| Net realized P&L | **+$335.24 (+0.34%)** |
+| Positions now | **0 — fully flat, all profit booked** |
+| Total filled orders | 5 |
+| Autonomous cycles logged | 47 (every 15 minutes) |
+
+### The trade — first live iron fly
+
+Entry context: **implied volatility 10.7% vs forecast 8.6% → VRP +2.2 points → sell premium.**
+
+| Leg | Action | Plan | Actual fill |
+|-----|--------|------|-------------|
+| Sell 764P + Sell 764C | ATM strangle | credit 7.94 | **filled at 8.45 net credit** (slippage in our favor) |
+| Buy 751P | put wing | 1.82 | 1.82 |
+| Buy 777C | call wing | 0.75 | 0.75 |
+
+The whole 4-leg structure went out as **one mleg order** and filled at open —
+better credit than the plan ($8.45 vs $7.94), max loss $4.55/contract by
+construction, total risk $910 ≈ 0.91% NAV (gate G5 cap: 1.5%).
+
+### Exit ledger — every leg booked
+
+| Leg | Action | Fill | P&L |
+|-----|--------|------|-----|
+| Short 765P | Buy to close — SPY dropped, put side won | 2.67 | **+$460** |
+| Long 779C | Sell — wing captured value | 1.46 | **+$142** |
+| Long 752P | Sell — hedge cost | 0.80 | −$204 |
+| Short 765C | Cut early per risk discipline | 6.36 | −$62 |
+| **Net** | **Fully booked, fully flat** | | **+$335.24** |
+
+The math worked exactly as designed: the fly was short premium at IV 10.7%
+vs forecast 8.6% — SPY's realized vol came in below implied, the short put
+decayed +460, and every exit was executed through the verified order path.
+The full journal (legs, credit, VRP at entry, agent verdict per trade) is on
+the dashboard Trades page.
 
 ---
 
@@ -158,10 +208,10 @@ The day-one iron fly payoff:
 
 ```
 P&L
-      +7.94 ────╮                  ╭──── +7.94   (max profit = credit)
+      +8.45 ────╮                  ╭──── +8.45   (max profit = credit)
                 ╰────────────────╯
               751      764      777      (strikes)
-max loss = 4.87 per contract, defined by construction
+max loss = 4.55 per contract, defined by construction
 ```
 
 ### Step 7 — The self-improving backtest loop (`loop_runner.py`)
@@ -273,6 +323,40 @@ A 3σ gap-day stress test backstops G3. The AI proposes. Math disposes.
 
 ---
 
+## What Makes VULCAN Original
+
+- **Veto-only AI authority.** Every agent project lets an LLM decide trades. Ours inverts it: the LLM sits *behind* seven deterministic gates and can only veto or shrink risk — never grow it. The AI proposes. Math disposes.
+- **The geometry trick.** Shorts placed at IMPLIED-sigma distances (rich credit) while win probability is computed with the FORECAST sigma — the VRP thesis encoded directly into strike geometry. Paid at implied prices, win at forecast probabilities.
+- **A risk system that caught its own creator.** Six real bugs — including an inverted Monte Carlo sign — were caught by the gates themselves before a cent was at risk. The system verifies itself. (See below.)
+- **Loop engineering until stability.** 504 walk-forward backtests over 4 rounds; convergence is declared when parameters stop moving, with out-of-sample and deflated-Sharpe gates. No cherry-picking.
+- **Transparency as architecture, not marketing.** The full bull/bear/PM debate is public word-for-word; the Monte Carlo lab is interactive — anyone can drag sliders and simulate 32,768 paths from live Alpaca data in the browser.
+- **Doing nothing is a feature.** The desk stays flat when the edge is thin — it correctly refused thin-premium structures for multiple cycles before day-one's fly.
+
+---
+
+## Alpaca Integration — Technology Implementation
+
+VULCAN is a fully autonomous agent: it is **still trading right now** with zero human input, driven by the complete Alpaca stack:
+
+| Alpaca capability | How VULCAN uses it | Where |
+|-------------------|--------------------|-------|
+| **Trading API — orders** | Multi-leg iron flys as single **mleg limit orders** (net-price convention, bounded worst-case slippage); market orders for exits; order cancel/replace | `vulcan/executor.py` |
+| **Trading API — brackets** | Stop + trailing-stop bracket orders for the long/short equity sleeve | `vulcan/equity_sleeve.py` |
+| **Trading API — positions & account** | Position polling, reconciliation, realized/unrealized P&L, buying-power checks every cycle | `vulcan/data.py` |
+| **Market Data API — options** | Live SPY option chains + snapshots (~10k contracts with IV + greeks) via `data.alpaca.markets` `/v1beta1/options/snapshots` | `vulcan/data.py`, `vulcan/pricer.py` |
+| **Market Data API — equities** | SPY price bars feeding the forecast ensemble | `vulcan/vol_forecaster.py` |
+| **Clock API** | `/v2/clock` market-hours gating — the agent only acts when the market acts | `vulcan/main.py` |
+| **Paper trading account** | Fresh $100,000 account (PA3KWDLKC2XQ) — every deliverable runs on it | end-to-end |
+| **Automation** | 15-minute scheduled cycles (Windows Task Scheduler) + a Cloudflare Worker/KV job queue so the dashboard's Run-Backtest button triggers real loop runs with live progress | `run_bot.bat`, `worker/worker.js`, `vulcan/remote.py` |
+
+The integration is direct REST (the same surface the Alpaca CLI/MCP tools wrap),
+chosen so the agent runs headless in production with zero SDK magic — every
+request, error body, and fill is logged and visible. The dashboard consumes the
+same Alpaca APIs server-side through the Worker, so judges can watch positions
+and orders update live: **https://vulcan-dashboard.arechampionw.workers.dev**
+
+---
+
 ## The Six Bugs Our Own System Caught
 
 We list these because honesty is the product. During development, VULCAN's own
@@ -289,34 +373,6 @@ risk system caught its creator — six times:
 
 The Monte Carlo gate catching bug #4 is the point of the whole design:
 the system verifies itself before it risks a cent.
-
----
-
-## Results — Day 1 Live Paper
-
-| Metric | Value |
-|--------|-------|
-| Start equity | $100,000.00 |
-| End equity (day 1, booked flat) | **$100,335.37** |
-| Structure | Iron fly: sell 764P + 764C, buy 751P + 777C wings |
-| Entry context | IV 10.7% vs forecast 8.6% (VRP +2.2) |
-| Credit / max loss per contract | $7.94 / $4.87 |
-| Max premium at risk | 1.37% NAV (gate G5) |
-| Autonomous cycles logged | 47 (every 15 min) |
-
-Exit ledger:
-
-| Leg | Action | P&L |
-|-----|--------|-----|
-| Short 765P | Closed — SPY dropped, put side won | **+$430** |
-| Long 779C | Closed — wing captured value | **+$142** |
-| Long 752P | Closed — hedge cost | −$204 |
-| Short 765C | Cut early per risk discipline | −$62 |
-| **Net day 1** | **Fully booked, fully flat** | **+$335.37** |
-
-The math worked exactly as designed: the fly was short premium at IV 10.7%
-vs forecast 8.6% — SPY's realized vol came in below implied, the short put
-decayed +430, and every exit was executed through the verified mleg path.
 
 ---
 
@@ -405,6 +461,20 @@ npx wrangler deploy
 | **Day 2** | Monte Carlo engine (GBM exact + 4 variance-reduction techniques + VaR/CVaR), Kelly sizing unified with builder, 6 real bugs found and fixed by the gates |
 | **Day 3** | Loop engineering: 504 walk-forward backtests over 4 rounds → converged parameters; dashboard live on Cloudflare with 8 pages |
 | **Day 4** | Self-improving loop wired to the dashboard Run button with live progress, interactive Monte Carlo lab, submission materials |
+
+---
+
+## Build in Public
+
+The whole journey was documented on X as a 5-post arc, tagging **@lablabai** and **@AlpacaHQ**:
+
+1. **What we're making** — the insurance-shop idea and why VRP
+2. **The math brain** — the three-model forecaster and the self-doubting backtest loop
+3. **The dashboard** — the live cockpit: debate transcripts, Monte Carlo lab, Run-Backtest button
+4. **The trade it refused** — the day the PM vetoed a thin trade and was right
+5. **The final result** — the live iron fly, the green close, the links
+
+Post links are on the hackathon submission form.
 
 ---
 
