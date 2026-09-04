@@ -1,4 +1,8 @@
-# VULCAN - Autonomous VRP Options Desk
+# -*- coding: utf-8 -*-
+"""Generate the final professional README.md for the vulcan repo. Clean ASCII only."""
+from pathlib import Path
+
+DOC = """# VULCAN - Autonomous VRP Options Desk
 
 > An autonomous AI trading agent that harvests the **variance risk premium (VRP)**:
 > it forecasts realized volatility with real math, compares it to what the options
@@ -225,20 +229,20 @@ vulcan/
 ```bash
 # 1. Python 3.11 venv + deps
 py -3.11 -m venv venv
-venv\Scripts\pip install alpaca-py pandas numpy scipy statsmodels scikit-learn arch hmmlearn python-dotenv tabulate requests
+venv\\Scripts\\pip install alpaca-py pandas numpy scipy statsmodels scikit-learn arch hmmlearn python-dotenv tabulate requests
 
 # 2. Secrets (never committed)
 copy .env.example .env        # fill in your Alpaca paper keys
 
 # 3. One trading cycle (safe, idempotent)
-venv\Scripts\python -m vulcan.main --dry-run     # dry run first
-venv\Scripts\python -m vulcan.main               # live paper cycle
+venv\\Scripts\\python -m vulcan.main --dry-run     # dry run first
+venv\\Scripts\\python -m vulcan.main               # live paper cycle
 
 # 4. The backtest loop (self-improving, until convergence)
-venv\Scripts\python -m vulcan.loop_runner
+venv\\Scripts\\python -m vulcan.loop_runner
 
 # 5. Monte Carlo engine demo
-venv\Scripts\python -m vulcan.montecarlo
+venv\\Scripts\\python -m vulcan.montecarlo
 
 # 6. Dashboard (React+TS+Vite -> Cloudflare Worker)
 cd dashboard && npm install && npm run build && cd ..
@@ -279,3 +283,8 @@ MIT - see [LICENSE](LICENSE).
 
 Educational hackathon project. Paper trading only. Nothing here is financial
 advice. Options involve substantial risk of loss.
+"""
+
+p = Path(__file__).parent / "README.md"
+p.write_text(DOC, encoding="utf-8")
+print(f"README.md written: {p} ({p.stat().st_size} bytes)")
