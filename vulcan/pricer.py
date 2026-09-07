@@ -258,13 +258,15 @@ def build_spread_plan(signal: VrpSignal, spot: float, direction_bias: float, cha
         if not short or not long:
             return None
         short.side, long.side = "sell", "buy"
-        diff = abs(short_k - long_k)
+        # TRUE width from the ACTUAL snapped strikes — never the sigma target.
+        # G3 caught this: chain snapping can widen strikes, understating max_loss.
+        diff = abs(short.strike - long.strike)
         if credit_side:
             credit = short.est_price - long.est_price
             if credit <= 0.05:
                 return None
             max_loss, max_profit = diff - credit, credit
-            be = short_k + (diff - credit) if short_kind == "C" else short_k - (diff - credit)
+            be = short.strike + (diff - credit) if short_kind == "C" else short.strike - (diff - credit)
         else:
             debit = long.est_price - short.est_price
             if debit <= 0.05:
@@ -319,12 +321,15 @@ def build_spread_plan(signal: VrpSignal, spot: float, direction_bias: float, cha
             atm_put.side, atm_call.side = "sell", "sell"
             lp.side, lc.side = "buy", "buy"
             credit = (atm_put.est_price + atm_call.est_price) - (lp.est_price + lc.est_price)
-            w = wing  # one-side width to a wing
+            # TRUE width from the ACTUAL snapped strikes — never the sigma target.
+            # G3 caught the old sigma-target width understating max_loss (~14%).
+            w = max(atm_put.strike - lp.strike, lc.strike - atm_call.strike)
             if credit <= 0.5 or credit / w < 0.20:
                 continue
-            # P(win): S_T within +/- wing under FORECAST vol
+            # P(win): S_T inside the CLOSER wing under FORECAST vol (conservative)
             sigma_fc_t = max(signal.rv_forecast, 0.03) * math.sqrt(dte / 365.0)
-            z = math.log((spot + wing) / spot) / sigma_fc_t
+            d_wing = min(lc.strike - spot, spot - lp.strike)
+            z = math.log((spot + d_wing) / spot) / sigma_fc_t
             p_win = 2.0 * phi3(z) - 1.0
             b = credit / max(w - credit, 1e-9)
             kedge = p_win * b - (1.0 - p_win)
@@ -333,7 +338,7 @@ def build_spread_plan(signal: VrpSignal, spot: float, direction_bias: float, cha
             cand = SpreadPlan(
                 name="iron_fly", legs=[atm_put, lp, atm_call, lc], width=w, credit=credit,
                 max_loss=w - credit, max_profit=credit,
-                breakeven=spot - (wing - (w - credit)), dte=dte,
+                breakeven=atm_put.strike - (w - credit), dte=dte,
                 rationale=f"VRP fly: ATM strangle {atm_put.est_price+atm_call.est_price:.2f}, "
                           f"wings {k:.1f}sig_impl, P(win){p_win:.0%}, kedge={kedge:.2f}")
             if best is None or kedge > best[0]:
