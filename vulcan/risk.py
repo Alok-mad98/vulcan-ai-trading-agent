@@ -116,7 +116,7 @@ def evaluate_plan(plan: SpreadPlan, spot: float, rv_forecast: float,
         return RiskDecision(False, 0, 0.0, ["G1 FAIL: structure has unbounded risk"])
 
     # G2 — turbulence gate: no NEW premium selling during vol shocks
-    if plan.name in ("iron_condor", "bull_put_spread", "bear_call_spread"):
+    if plan.name in ("iron_fly", "iron_condor", "bull_put_spread", "bear_call_spread"):
         if vix is not None and vix > 28:
             reasons.append(f"G2 VETO: VIX {vix:.0f} > 28 (stress)")
         if vix_chg is not None and vix_chg > 0.12:
